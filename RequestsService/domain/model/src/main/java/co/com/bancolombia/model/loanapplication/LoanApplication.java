@@ -14,7 +14,7 @@ public class LoanApplication {
     String id;
     BigDecimal amount;
     Integer termMonths;
-    String IdentificationNumber;
+    String identificationNumber;
     String email;
     Integer statusId;
     Integer loanTypeId;
