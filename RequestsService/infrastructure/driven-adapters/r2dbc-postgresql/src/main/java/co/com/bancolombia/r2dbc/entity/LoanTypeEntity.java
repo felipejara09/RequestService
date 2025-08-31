@@ -16,7 +16,7 @@ public class LoanTypeEntity {
 
     @Id
     @Column("id_loan_type")
-    private Integer id;
+    private Long loanTypeId;
     private String name;
     private BigDecimal minAmount;
     private BigDecimal maxAmount;

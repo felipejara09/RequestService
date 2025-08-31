@@ -7,6 +7,7 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -14,14 +15,17 @@ import java.math.BigDecimal;
 @Builder
 @Table("application")
 public class LoanApplicationEntity {
+
     @Id
     @Column("id_application")
-    private String id;
+    private UUID applicationId;
     private BigDecimal amount;
+    @Column("term_months")
     private Integer termMonths;
-    private String email;
     private String identificationNumber;
-    private Integer idState;
-    private Integer idLoanType;
-
+    private String email;
+    @Column("id_state")
+    private Integer statusId;
+    @Column("id_loan_type")
+    private Integer loanTypeId;
 }

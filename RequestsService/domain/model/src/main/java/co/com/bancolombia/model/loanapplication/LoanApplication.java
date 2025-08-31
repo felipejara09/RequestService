@@ -2,6 +2,7 @@ package co.com.bancolombia.model.loanapplication;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 
 @Getter
@@ -11,7 +12,7 @@ import java.math.BigDecimal;
 @Builder(toBuilder = true)
 public class LoanApplication {
 
-    String id;
+    UUID applicationId;
     BigDecimal amount;
     Integer termMonths;
     String identificationNumber;

@@ -9,25 +9,25 @@ spring:
     console:
       enabled: true
       path: "/h2"
+  app:
+    postgresql:
+      host: "localhost"
+      port: 5432
+      database: "loan_applications"
+      username: "postgres"
+      password: "postgrespws"
+    r2dbc:
+      url: "r2dbc:postgresql://localhost:5432/loan_applications"
+      username: "postgres"
+      password: "postgrespws"
+    flyway:
+      url: "jdbc:postgresql://localhost:5432/loan_applications"
+      user: "postgres"
+      password: "postgrespws"
+      locations: "classpath:db/migration"
   profiles:
     include: null
 management:
-  app:
-    postgresql:
-      host: localhost
-      port: 5432
-      database: requests
-      username: postgres
-      password: postgrespws
-  r2dbc:
-    url: r2dbc:postgresql://localhost:5432/requests
-    username: postgres
-    password: postgrespws
-    flyway:
-      url: jdbc:postgresql://localhost:5432/requests
-      user: postgres
-      password: postgrespws
-      locations: classpath:db/migration
   endpoints:
     web:
       exposure:
@@ -36,5 +36,32 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
 cors:
-  allowed-origins: "http://localhost:4200,http://localhost:8080"
+  allowed-origins: "http://localhost:4200,http://localhost:8081"
+customer:
+  service:
+    base-url: "http://localhost:8080"
+resilience4j:
+  circuitbreaker:
+    instances:
+      testGet:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"
+      testPost:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"
