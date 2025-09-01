@@ -25,8 +25,9 @@ public class RestConsumer implements CustumerServiceGateway {
     @Override
     public Mono<Boolean> verifyIdentity(String identificationNumber, String email) {
         return client.get()
-                .uri(uri -> uri.path("/api/v1/usuarios/verify-email")
+                .uri(uri -> uri.path("/api/v1/usuarios/verify")
                         .queryParam("email", email)
+                        .queryParam("identityNumber", identificationNumber)
                         .build())
                 .exchangeToMono(resp -> {
                     if (resp.statusCode().is2xxSuccessful()) return Mono.just(true);

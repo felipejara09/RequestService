@@ -1,4 +1,4 @@
-package co.com.bancolombia.r2dbc;
+package co.com.bancolombia.r2dbc.gateways;
 
 import co.com.bancolombia.r2dbc.entity.LoanTypeEntity;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;

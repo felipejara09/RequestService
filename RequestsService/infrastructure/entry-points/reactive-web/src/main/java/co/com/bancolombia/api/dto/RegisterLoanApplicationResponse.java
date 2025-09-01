@@ -1,4 +1,7 @@
 package co.com.bancolombia.api.dto;
 
-public record RegisterLoanApplicationResponse(String applicationId,
-                                              Integer statusId) {}
+import java.util.UUID;
+
+public record RegisterLoanApplicationResponse(UUID applicationId,
+                                              Integer statudId,
+                                              String statusName) {}

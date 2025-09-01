@@ -1,4 +1,4 @@
-package co.com.bancolombia.r2dbc;
+package co.com.bancolombia.r2dbc.gateways;
 
 import co.com.bancolombia.r2dbc.entity.LoanApplicationEntity;
 import org.springframework.data.repository.query.ReactiveQueryByExampleExecutor;
