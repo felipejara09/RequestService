@@ -72,7 +72,7 @@ public class RegisterLoanApplicationUseCaseTest{
 
     @Test
     void shouldErrorWhenAmountOutOfRange() {
-        // Fuerza un monto fuera del rango (menor que el mínimo)
+
         LoanApplication badCmd = cmd.toBuilder().amount(new BigDecimal("500")).build();
 
         when(loanTypeRepository.findById(10)).thenReturn(Mono.just(loanTypeOk));
@@ -110,7 +110,7 @@ public class RegisterLoanApplicationUseCaseTest{
         when(customerGateway.verifyIdentity("123456789", "user@test.com")).thenReturn(Mono.just(true));
 
         LoanApplication saved = cmd.toBuilder()
-                .applicationId(APP_ID)        // <-- UUID, no long
+                .applicationId(APP_ID)
                 .statusId(1)
                 .build();
         when(loanApplicationRepository.save(any(LoanApplication.class))).thenReturn(Mono.just(saved));
@@ -151,7 +151,7 @@ public class RegisterLoanApplicationUseCaseTest{
 
         StepVerifier.create(useCase.execute(cmd))
                 .assertNext(result -> {
-                    assertThat(result.applicationId()).isEqualTo(APP_ID); // <-- comparar UUID
+                    assertThat(result.applicationId()).isEqualTo(APP_ID);
                     assertThat(result.statusId()).isEqualTo(1);
                     assertThat(result.statusName()).isEqualTo("Pending review");
                 })

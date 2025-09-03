@@ -26,7 +26,7 @@ public class Handler {
         return request
                 .bodyToMono(RegisterLoanApplicationRequest.class)
                 .map(RegisterLoanApplicationRequest::toDomain)
-                .flatMap(useCase::execute) // ahora devuelve RegisterLoanApplicationResult
+                .flatMap(useCase::execute)
                 .flatMap(res ->
                         ServerResponse.created(URI.create("/api/v1/solicitud/" + res.applicationId()))
                                 .contentType(MediaType.APPLICATION_JSON)

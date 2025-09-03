@@ -41,67 +41,8 @@ public class RestConsumer implements CustumerServiceGateway {
                 })
                 .timeout(java.time.Duration.ofSeconds(5));
     }
-    private Mono<Boolean> doGetVerify(String id, String email) {
-        return client.get()
-                .uri(uri -> uri.path("/api/v1/usuarios")
-                        .queryParam("identityNumber", id)
-                        .queryParam("email", email)
-                        .build())
-                .exchangeToMono(resp -> {
-                    if (resp.statusCode().is2xxSuccessful()) {
 
-                        return Mono.just(true);
-                    }
-                    if (resp.statusCode() == HttpStatus.NOT_FOUND) {
 
-                        return Mono.just(false);
-                    }
-                    if (resp.statusCode().is4xxClientError()) {
-
-                        return resp.bodyToMono(String.class)
-                                .defaultIfEmpty("")
-                                .doOnNext(body -> log.warn("GET verify 4xx: status={}, body={}", resp.statusCode(), body))
-                                .thenReturn(false);
-                    }
-
-                    return resp.createException().flatMap(Mono::error);
-                })
-                .timeout(Duration.ofSeconds(3));
-    }
-
-    private Mono<Boolean> doPostVerify(String id, String email) {
-        var payload = Map.of("identificationNumber", id, "email", email);
-        return client.post()
-                .uri("/api/v1/usuarios/verify") // <-- ajusta a tu endpoint real si es distinto
-                .bodyValue(payload)
-                .exchangeToMono(resp -> {
-                    if (resp.statusCode().is2xxSuccessful()) return Mono.just(true);
-                    if (resp.statusCode() == HttpStatus.NOT_FOUND) return Mono.just(false);
-                    if (resp.statusCode().is4xxClientError()) {
-                        return resp.bodyToMono(String.class)
-                                .defaultIfEmpty("")
-                                .doOnNext(body -> log.warn("POST verify 4xx: status={}, body={}", resp.statusCode(), body))
-                                .thenReturn(false);
-                    }
-                    return resp.createException().flatMap(Mono::error);
-                })
-                .timeout(Duration.ofSeconds(3));
-    }
-
-    /*@CircuitBreaker(name = "AutheticationService", fallbackMethod = "verifyFallback")
-    public Mono<Boolean> verifyIdentity(String id, String email) {
-        return webClient.post()
-                .uri("/api/v1/customers/verify")
-                .bodyValue(Map.of("identificationNumber", id, "email", email))
-                .retrieve()
-                .bodyToMono(VerifyResponse.class)
-                .map(VerifyResponse::isVerified)
-                .timeout(Duration.ofSeconds(3)); // combina con timeout
-    }
-
-    private Mono<Boolean> verifyFallback(String id, String email, Throwable ex) {
-        return Mono.error(new DomainException("CUSTOMER_NOT_VERIFIED"));
-    }*/
 
 
 }
