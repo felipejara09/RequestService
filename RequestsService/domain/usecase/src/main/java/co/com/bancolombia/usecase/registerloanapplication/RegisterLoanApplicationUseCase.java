@@ -13,6 +13,7 @@ import co.com.bancolombia.usecase.exception.DomainException;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 
+
 import java.math.BigDecimal;
 
 
@@ -24,26 +25,20 @@ public class RegisterLoanApplicationUseCase {
     private final LoanApplicationRepository loanApplicationRepository;
     private final StateRepository stateRepository;
 
-    /*public Mono<RegisterLoanApplicationResult> execute(LoanApplication cmd) {
-        return loanTypeRepository.findById(cmd.getLoanTypeId())
-                .switchIfEmpty(Mono.error(new DomainException("LOAN_TYPE_NOT_FOUND")))
-                .flatMap(type -> validateAmount(cmd.getAmount(), type)
-                        .then(customerGateway.verifyIdentity(cmd.getIdentificationNumber(), cmd.getEmail()))
-                        .flatMap(verified -> verified
-                                ? persist(cmd, 1)
-                                : Mono.error(new DomainException("CUSTOMER_NOT_VERIFIED"))));
-    }*/
 
     public Mono<RegisterLoanApplicationResult> execute(LoanApplication cmd) {
         return loanTypeRepository.findById(cmd.getLoanTypeId())
+                .log("RegisterLoanApplicationUseCase.findById")             // INFO por defecto
                 .switchIfEmpty(Mono.error(new DomainException("LOAN_TYPE_NOT_FOUND")))
                 .flatMap(type ->
                         validateAmount(cmd.getAmount(), type)
-                                .then(Mono.defer(() -> customerGateway.verifyIdentity(
-                                        cmd.getIdentificationNumber(), cmd.getEmail())))
+                                .log("RegisterLoanApplicationUseCase.validateAmount")
+                                .then(customerGateway.verifyIdentity(cmd.getIdentificationNumber(), cmd.getEmail()))
+                                .log("RegisterLoanApplicationUseCase.verifyIdentity")
                                 .flatMap(verified -> verified
-                                        ? persist(cmd, 1)
-                                        : Mono.error(new DomainException("CUSTOMER_NOT_VERIFIED")))
+                                        ? persist(cmd, 1).log("RegisterLoanApplicationUseCase.persist")
+                                        : Mono.error(new DomainException("CUSTOMER_NOT_VERIFIED"))
+                                )
                 );
     }
 

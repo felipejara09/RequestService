@@ -6,12 +6,14 @@ import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
+
 @Configuration
 public class RouterRest {
     @Bean
-    public RouterFunction<ServerResponse> routes(Handler handler) {
+    public RouterFunction<ServerResponse> routes(Handler handler, Handler listHandler) {
         return RouterFunctions.route()
                 .POST("/api/v1/solicitud", handler::register)
+                .GET ("/api/v1/solicitud", listHandler::list)
                 .build();
     }
 
