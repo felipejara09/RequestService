@@ -1,6 +1,8 @@
 package co.com.bancolombia.usecase.registerloanapplication;
 
 
+import co.com.bancolombia.model.auth.Actor;
+import co.com.bancolombia.model.auth.Role;
 import co.com.bancolombia.model.loanapplication.LoanApplication;
 import co.com.bancolombia.model.loanapplication.LoanType;
 import co.com.bancolombia.model.loanapplication.State;
@@ -26,19 +28,32 @@ public class RegisterLoanApplicationUseCase {
     private final StateRepository stateRepository;
 
 
-    public Mono<RegisterLoanApplicationResult> execute(LoanApplication cmd) {
-        return loanTypeRepository.findById(cmd.getLoanTypeId())
-                .log("RegisterLoanApplicationUseCase.findById")             // INFO por defecto
+    public Mono<RegisterLoanApplicationResult> execute(LoanApplication cmd, Actor actor) {
+        if (actor == null || actor.getRole() == null) {
+            return Mono.error(new DomainException("UNAUTHORIZED"));
+        }
+
+
+        final LoanApplication finalCmd;
+        if (actor.getRole() == Role.CLIENT) {
+            String normalizedEmail = normalize(cmd.getEmail());
+            if (!equalsIgnoreCaseTrim(normalizedEmail, actor.getEmail())) {
+                return Mono.error(new DomainException("FORBIDDEN_OTHER_CUSTOMER"));
+            }
+            finalCmd = cmd.toBuilder().email(normalizedEmail).build();
+        } else {
+            finalCmd = cmd;
+        }
+
+        return loanTypeRepository.findById(finalCmd.getLoanTypeId())
                 .switchIfEmpty(Mono.error(new DomainException("LOAN_TYPE_NOT_FOUND")))
                 .flatMap(type ->
-                        validateAmount(cmd.getAmount(), type)
-                                .log("RegisterLoanApplicationUseCase.validateAmount")
-                                .then(customerGateway.verifyIdentity(cmd.getIdentificationNumber(), cmd.getEmail()))
-                                .log("RegisterLoanApplicationUseCase.verifyIdentity")
+                        validateAmount(finalCmd.getAmount(), type)
+                                .then(Mono.defer(() -> customerGateway.verifyIdentity(
+                                        finalCmd.getIdentificationNumber(), finalCmd.getEmail())))
                                 .flatMap(verified -> verified
-                                        ? persist(cmd, 1).log("RegisterLoanApplicationUseCase.persist")
-                                        : Mono.error(new DomainException("CUSTOMER_NOT_VERIFIED"))
-                                )
+                                        ? persist(finalCmd, 1)
+                                        : Mono.error(new DomainException("CUSTOMER_NOT_VERIFIED")))
                 );
     }
 
@@ -52,7 +67,7 @@ public class RegisterLoanApplicationUseCase {
                 .identificationNumber(cmd.getIdentificationNumber())
                 .email(cmd.getEmail())
                 .amount(cmd.getAmount())
-                .termMonths (cmd.getTermMonths())
+                .termMonths(cmd.getTermMonths())
                 .loanTypeId(cmd.getLoanTypeId())
                 .statusId(statusId)
                 .build();
@@ -61,12 +76,17 @@ public class RegisterLoanApplicationUseCase {
                         stateRepository.findNameById(saved.getStatusId())
                                 .map(State::getName)
                                 .defaultIfEmpty("Pending review")
-                                .map(statusName  -> new RegisterLoanApplicationResult(
+                                .map(statusName -> new RegisterLoanApplicationResult(
                                         saved.getApplicationId(),
                                         saved.getStatusId(),
                                         statusName
-                                ))
-                );
+                                )));
     }
 
+    private static String normalize(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+    private static boolean equalsIgnoreCaseTrim(String a, String b) {
+        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
+    }
 }

@@ -1,6 +1,8 @@
 package co.com.bancolombia.usecase.registerloanapplication;
 
 
+import co.com.bancolombia.model.auth.Actor;
+import co.com.bancolombia.model.auth.Role;
 import co.com.bancolombia.model.loanapplication.*;
 import co.com.bancolombia.model.loanapplication.gateways.*;
 import co.com.bancolombia.usecase.exception.DomainException;
@@ -29,132 +31,324 @@ public class RegisterLoanApplicationUseCaseTest{
     @Mock LoanApplicationRepository loanApplicationRepository;
     @Mock StateRepository stateRepository;
 
-    @InjectMocks
-    RegisterLoanApplicationUseCase useCase;
+    @InjectMocks RegisterLoanApplicationUseCase useCase;
 
-    private LoanApplication cmd;
-    private LoanType loanTypeOk;
-
-    private static final UUID APP_ID =
-            UUID.fromString("80b28def-481b-425f-9515-7a4ee4dec127");
+    LoanApplication baseCmd;
 
     @BeforeEach
     void setUp() {
-        cmd = LoanApplication.builder()
-                .identificationNumber("123456789")
-                .email("user@test.com")
-                .amount(new BigDecimal("5000"))
-                .termMonths(24)
-                .loanTypeId(10)
-                .build();
-
-        loanTypeOk = LoanType.builder()
-                .loanTypeId(1L)
-                .minAmount(new BigDecimal("1000"))
-                .maxAmount(new BigDecimal("10000"))
+        baseCmd = LoanApplication.builder()
+                .applicationId(null)
+                .amount(new BigDecimal("150000"))
+                .termMonths(12)
+                .identificationNumber("102412357")
+                .email("client@crediya.com")
+                .statusId(null)
+                .loanTypeId(1)
                 .build();
     }
 
+    //Devuelve UNAUTHORIZED cuando no hay actor (usuario autenticado).
     @Test
-    void shouldErrorWhenLoanTypeNotFound() {
-        when(loanTypeRepository.findById(10)).thenReturn(Mono.empty());
+    void unauthorizedWhenNoActor() {
+        StepVerifier.create(useCase.execute(baseCmd, null))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("UNAUTHORIZED");
+                })
+                .verify();
+        verifyNoInteractions(loanTypeRepository, customerGateway, loanApplicationRepository, stateRepository);
+    }
+    //Devuelve UNAUTHORIZED cuando el actor existe pero viene sin rol.
+    @Test
+    void unauthorizedWhenActorHasNullRole() {
+        Actor actor = Actor.builder().role(null).email("x@x.com").build();
+        StepVerifier.create(useCase.execute(baseCmd, actor))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("UNAUTHORIZED");
+                })
+                .verify();
+    }
+    //Un CLIENTE no puede crear solicitud para otro correo; devuelve FORBIDDEN_OTHER_CUSTOMER.
+    @Test
+    void clientCannotCreateForAnotherEmail() {
+        Actor client = Actor.builder().role(Role.CLIENT).email("other@crediya.com").build();
 
-        StepVerifier.create(useCase.execute(cmd))
-                .expectErrorSatisfies(err -> {
-                    assertThat(err).isInstanceOf(DomainException.class);
-                    assertThat(err.getMessage()).isEqualTo("LOAN_TYPE_NOT_FOUND");
+        StepVerifier.create(useCase.execute(baseCmd, client))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("FORBIDDEN_OTHER_CUSTOMER");
+                })
+                .verify();
+        verifyNoInteractions(loanTypeRepository, customerGateway, loanApplicationRepository, stateRepository);
+    }
+
+    // CLIENTE con email en token, pero el comando viene sin email -> debe prohibir
+    @Test
+    void clientEmailNull_forbiddenOtherCustomer() {
+
+        Actor client = Actor.builder().role(Role.CLIENT).email("client@crediya.com").build();
+        LoanApplication cmd = baseCmd.toBuilder().email(null).build();
+
+        StepVerifier.create(useCase.execute(cmd, client))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("FORBIDDEN_OTHER_CUSTOMER");
                 })
                 .verify();
 
-        verify(customerGateway, never()).verifyIdentity(anyString(), anyString());
-        verifyNoInteractions(loanApplicationRepository, stateRepository);
+        verifyNoInteractions(loanTypeRepository, customerGateway, loanApplicationRepository, stateRepository);
     }
 
+    //Si no existe el tipo de préstamo, devuelve LOAN_TYPE_NOT_FOUND.
     @Test
-    void shouldErrorWhenAmountOutOfRange() {
+    void loanTypeNotFound() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.empty());
 
-        LoanApplication badCmd = cmd.toBuilder().amount(new BigDecimal("500")).build();
-
-        when(loanTypeRepository.findById(10)).thenReturn(Mono.just(loanTypeOk));
-
-        StepVerifier.create(useCase.execute(badCmd))
-                .expectErrorSatisfies(err -> {
-                    assertThat(err).isInstanceOf(DomainException.class);
-                    assertThat(err.getMessage()).isEqualTo("AMOUNT_OUT_OF_RANGE");
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("LOAN_TYPE_NOT_FOUND");
                 })
                 .verify();
+    }
+    //Monto fuera de rango por DEBAJO del mínimo; devuelve AMOUNT_OUT_OF_RANGE.
+    @Test
+    void amountOutOfRange() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("X")
+                .minAmount(new BigDecimal("200000"))
+                .maxAmount(new BigDecimal("300000"))
+                .interestRate(10.0)
+                .autovalidation(null)
+                .build();
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
 
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("AMOUNT_OUT_OF_RANGE");
+                })
+                .verify();
         verify(customerGateway, never()).verifyIdentity(anyString(), anyString());
-        verifyNoInteractions(loanApplicationRepository, stateRepository);
+    }
+
+    //Monto fuera de rango por ENCIMA del máximo; devuelve AMOUNT_OUT_OF_RANGE.
+    @Test
+    void amountAboveMax_isOutOfRange() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
+
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("X")
+                .minAmount(new BigDecimal("100000"))
+                .maxAmount(new BigDecimal("120000")) // max por debajo del cmd.amount=150000
+                .interestRate(10.0)
+                .autovalidation(null)
+                .build();
+
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
+
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("AMOUNT_OUT_OF_RANGE");
+                })
+                .verify();
+    }
+    //La verificación de identidad (gateway) responde false; devuelve CUSTOMER_NOT_VERIFIED.
+    @Test
+    void customerNotVerified() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("Y")
+                .minAmount(new BigDecimal("100000"))
+                .maxAmount(new BigDecimal("300000"))
+                .interestRate(11.5)
+                .autovalidation(null)
+                .build();
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
+        when(customerGateway.verifyIdentity("102412357", "client@crediya.com")).thenReturn(Mono.just(false));
+
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .expectErrorSatisfies(ex -> {
+                    assertThat(ex).isInstanceOf(DomainException.class);
+                    assertThat(ex.getMessage()).isEqualTo("CUSTOMER_NOT_VERIFIED");
+                })
+                .verify();
+        verify(loanApplicationRepository, never()).save(any());
+    }
+
+    //Flujo feliz como CLIENTE: persiste la solicitud y retorna el estado con su nombre.
+    @Test
+    void successFlowPersistsAndReturnsStatusName() {
+        Actor client = Actor.builder().role(Role.CLIENT).email("client@crediya.com").build();
+
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("Mortgage")
+                .minAmount(new BigDecimal("100000"))
+                .maxAmount(new BigDecimal("300000"))
+                .interestRate(11.5)
+                .autovalidation(null)
+                .build();
+
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
+        when(customerGateway.verifyIdentity("102412357", "client@crediya.com")).thenReturn(Mono.just(true));
+
+
+        ArgumentCaptor<LoanApplication> savedCaptor = ArgumentCaptor.forClass(LoanApplication.class);
+        UUID appId = UUID.randomUUID();
+        LoanApplication saved = LoanApplication.builder()
+                .applicationId(appId)
+                .amount(baseCmd.getAmount())
+                .termMonths(baseCmd.getTermMonths())
+                .identificationNumber(baseCmd.getIdentificationNumber())
+                .email(baseCmd.getEmail())
+                .loanTypeId(baseCmd.getLoanTypeId())
+                .statusId(1)
+                .build();
+
+        when(loanApplicationRepository.save(savedCaptor.capture())).thenReturn(Mono.just(saved));
+        when(stateRepository.findNameById(1)).thenReturn(Mono.just(
+                State.builder().stateId(1).name("Pending Review").description("x").build()
+        ));
+
+        StepVerifier.create(useCase.execute(baseCmd, client))
+                .assertNext(res -> {
+                    assertThat(res).isNotNull();
+                    assertThat(res.applicationId()).isEqualTo(appId);
+                    assertThat(res.statusId()).isEqualTo(1);
+                    assertThat(res.statusName()).isEqualTo("Pending Review");
+                })
+                .verifyComplete();
+
+        LoanApplication toPersist = savedCaptor.getValue();
+        assertThat(toPersist.getEmail()).isEqualTo("client@crediya.com");
+        assertThat(toPersist.getStatusId()).isEqualTo(1);
+    }
+
+
+
+    //Flujo feliz como ASESOR/ADMIN: persiste y retorna datos correctamente.
+    @Test
+    void successFlowAsAdvisor() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
+
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("Mortgage")
+                .minAmount(new BigDecimal("100000"))
+                .maxAmount(new BigDecimal("300000"))
+                .interestRate(11.5)
+                .autovalidation(null)
+                .build();
+
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
+        when(customerGateway.verifyIdentity("102412357", "client@crediya.com")).thenReturn(Mono.just(true));
+
+        UUID appId = UUID.randomUUID();
+        LoanApplication saved = LoanApplication.builder()
+                .applicationId(appId)
+                .amount(baseCmd.getAmount())
+                .termMonths(baseCmd.getTermMonths())
+                .identificationNumber(baseCmd.getIdentificationNumber())
+                .email(baseCmd.getEmail())
+                .loanTypeId(baseCmd.getLoanTypeId())
+                .statusId(1)
+                .build();
+
+        when(loanApplicationRepository.save(any())).thenReturn(Mono.just(saved));
+        when(stateRepository.findNameById(1)).thenReturn(Mono.just(
+                State.builder().stateId(1).name("Pending Review").description("x").build()
+        ));
+
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .assertNext(res -> {
+                    assertThat(res.applicationId()).isEqualTo(appId);
+                    assertThat(res.statusId()).isEqualTo(1);
+                    assertThat(res.statusName()).isEqualTo("Pending Review");
+                })
+                .verifyComplete();
+    }
+
+    //Si no se encuentra el nombre de estado en la BD, usa "Pending review" por defecto
+    @Test
+    void successFlow_usesDefaultStatusNameWhenStateMissing() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
+
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("Mortgage")
+                .minAmount(new BigDecimal("100000"))
+                .maxAmount(new BigDecimal("300000"))
+                .interestRate(11.5)
+                .autovalidation(null)
+                .build();
+
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
+        when(customerGateway.verifyIdentity("102412357", "client@crediya.com")).thenReturn(Mono.just(true));
+
+        UUID appId = UUID.randomUUID();
+        LoanApplication saved = LoanApplication.builder()
+                .applicationId(appId)
+                .amount(baseCmd.getAmount())
+                .termMonths(baseCmd.getTermMonths())
+                .identificationNumber(baseCmd.getIdentificationNumber())
+                .email(baseCmd.getEmail())
+                .loanTypeId(baseCmd.getLoanTypeId())
+                .statusId(1)
+                .build();
+
+        when(loanApplicationRepository.save(any())).thenReturn(Mono.just(saved));
+        when(stateRepository.findNameById(1)).thenReturn(Mono.empty());
+
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .assertNext(res -> {
+                    assertThat(res.statusName()).isEqualTo("Pending review");
+                })
+                .verifyComplete();
     }
 
     @Test
-    void shouldErrorWhenCustomerNotVerified() {
-        when(loanTypeRepository.findById(10)).thenReturn(Mono.just(loanTypeOk));
-        when(customerGateway.verifyIdentity("123456789", "user@test.com")).thenReturn(Mono.just(false));
+    void verifyIdentityErrorIsPropagated() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
 
-        StepVerifier.create(useCase.execute(cmd))
-                .expectErrorSatisfies(err -> {
-                    assertThat(err).isInstanceOf(DomainException.class);
-                    assertThat(err.getMessage()).isEqualTo("CUSTOMER_NOT_VERIFIED");
-                })
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("X")
+                .minAmount(new BigDecimal("100000"))
+                .maxAmount(new BigDecimal("300000"))
+                .interestRate(11.5)
+                .build();
+
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
+        when(customerGateway.verifyIdentity("102412357", "client@crediya.com"))
+                .thenReturn(Mono.error(new RuntimeException("boom")));
+
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .expectErrorMatches(e -> e instanceof RuntimeException && e.getMessage().equals("boom"))
                 .verify();
 
         verify(loanApplicationRepository, never()).save(any());
-        verify(stateRepository, never()).findNameById(any());
     }
 
     @Test
-    void shouldPersistAndReturnResultWithStateName() {
-        when(loanTypeRepository.findById(10)).thenReturn(Mono.just(loanTypeOk));
-        when(customerGateway.verifyIdentity("123456789", "user@test.com")).thenReturn(Mono.just(true));
+    void repositorySaveErrorIsPropagated() {
+        Actor advisor = Actor.builder().role(Role.ADVISOR).email("advisor@crediya.com").build();
 
-        LoanApplication saved = cmd.toBuilder()
-                .applicationId(APP_ID)
-                .statusId(1)
+        LoanType lt = LoanType.builder()
+                .loanTypeId(1L).name("X")
+                .minAmount(new BigDecimal("100000"))
+                .maxAmount(new BigDecimal("300000"))
+                .interestRate(11.5)
                 .build();
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenReturn(Mono.just(saved));
 
-        when(stateRepository.findNameById(1)).thenReturn(Mono.just(State.builder().name("En validación").build()));
+        when(loanTypeRepository.findById(1)).thenReturn(Mono.just(lt));
+        when(customerGateway.verifyIdentity("102412357", "client@crediya.com")).thenReturn(Mono.just(true));
+        when(loanApplicationRepository.save(any())).thenReturn(Mono.error(new RuntimeException("db-error")));
 
-        StepVerifier.create(useCase.execute(cmd))
-                .assertNext(result -> {
-                    assertThat(result.applicationId()).isEqualTo(APP_ID);
-                    assertThat(result.statusId()).isEqualTo(1);
-                    assertThat(result.statusName()).isEqualTo("En validación");
-                })
-                .verifyComplete();
-
-        ArgumentCaptor<LoanApplication> captor = ArgumentCaptor.forClass(LoanApplication.class);
-        verify(loanApplicationRepository).save(captor.capture());
-        LoanApplication toSave = captor.getValue();
-        assertThat(toSave.getIdentificationNumber()).isEqualTo("123456789");
-        assertThat(toSave.getEmail()).isEqualTo("user@test.com");
-        assertThat(toSave.getAmount()).isEqualByComparingTo("5000");
-        assertThat(toSave.getTermMonths()).isEqualTo(24);
-        assertThat(toSave.getLoanTypeId()).isEqualTo(10);
-        assertThat(toSave.getStatusId()).isEqualTo(1);
+        StepVerifier.create(useCase.execute(baseCmd, advisor))
+                .expectErrorMatches(e -> e instanceof RuntimeException && e.getMessage().equals("db-error"))
+                .verify();
     }
 
-    @Test
-    void shouldPersistAndReturnDefaultStatusWhenStateEmpty() {
-        when(loanTypeRepository.findById(10)).thenReturn(Mono.just(loanTypeOk));
-        when(customerGateway.verifyIdentity("123456789", "user@test.com")).thenReturn(Mono.just(true));
-
-        LoanApplication saved = cmd.toBuilder()
-                .applicationId(APP_ID)
-                .statusId(1)
-                .build();
-        when(loanApplicationRepository.save(any(LoanApplication.class))).thenReturn(Mono.just(saved));
-
-        when(stateRepository.findNameById(1)).thenReturn(Mono.empty());
-
-        StepVerifier.create(useCase.execute(cmd))
-                .assertNext(result -> {
-                    assertThat(result.applicationId()).isEqualTo(APP_ID);
-                    assertThat(result.statusId()).isEqualTo(1);
-                    assertThat(result.statusName()).isEqualTo("Pending review");
-                })
-                .verifyComplete();
-    }
 }

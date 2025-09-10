@@ -17,6 +17,9 @@ public final class ErrorMapper {
                 case "LOAN_TYPE_NOT_FOUND" -> HttpStatus.BAD_REQUEST;
                 case "AMOUNT_OUT_OF_RANGE" -> HttpStatus.BAD_REQUEST;
                 case "CUSTOMER_NOT_VERIFIED" -> HttpStatus.UNPROCESSABLE_ENTITY;
+                case "FORBIDDEN" -> HttpStatus.FORBIDDEN;
+                case "FORBIDDEN_OTHER_CUSTOMER" -> HttpStatus.FORBIDDEN;
+                case "UNAUTHORIZED" -> HttpStatus.UNAUTHORIZED;
                 default -> HttpStatus.BAD_REQUEST;
             };
             return ServerResponse.status(status)
