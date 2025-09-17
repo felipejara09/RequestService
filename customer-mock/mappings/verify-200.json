@@ -1,0 +1,9 @@
+﻿{
+  "priority": 1,
+  "request": { "method": "GET", "urlPath": "/api/v1/usuarios/verify" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "verified": true }
+  }
+}
