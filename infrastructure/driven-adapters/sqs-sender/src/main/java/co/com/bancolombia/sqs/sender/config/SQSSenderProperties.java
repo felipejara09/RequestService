@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "aws")
 public class SQSSenderProperties {
     private String region;
-    private String endpointOverride; // ej: http://localhost:4566 (vacío en AWS real)
+    private String endpointOverride;
 
     @Data
     public static class Sqs {
