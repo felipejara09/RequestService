@@ -86,12 +86,43 @@ public class RouterRest {
                                             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
                             }
                     )
+            ),
+            @RouterOperation(
+                    path = "/api/v1/solicitud",
+                    produces = MediaType.APPLICATION_JSON_VALUE,
+                    method = RequestMethod.PUT,
+                    beanClass = Handler.class,
+                    beanMethod = "changeStatus",
+                    operation = @Operation(
+                            operationId = "changeLoanApplicationStatus",
+                            summary = "Aprobar/Rechazar solicitud",
+                            description = "Cambia el estado de la solicitud a Aprobado o Rechazado.",
+                            security = { @SecurityRequirement(name = "bearerAuth") },
+                            requestBody = @RequestBody(required = true,
+                                    content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.DecisionRequest.class))),
+                            responses = {
+                                    @ApiResponse(responseCode = "200", description = "OK",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.DecisionResponse.class))),
+                                    @ApiResponse(responseCode = "400", description = "Bad Request",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "401", description = "Unauthorized",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "403", description = "Forbidden",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "404", description = "Not Found",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class)))
+                            }
+                    )
             )
+
     })
     public RouterFunction<ServerResponse> routes(Handler handler) {
         return RouterFunctions.route()
                 .POST("/api/v1/solicitud", handler::register)
                 .GET("/api/v1/solicitud", handler::list)
+                .PUT("/api/v1/solicitud", handler::changeStatus)
                 .build();
     }
 }

@@ -20,6 +20,8 @@ public final class ErrorMapper {
                 case "FORBIDDEN" -> HttpStatus.FORBIDDEN;
                 case "FORBIDDEN_OTHER_CUSTOMER" -> HttpStatus.FORBIDDEN;
                 case "UNAUTHORIZED" -> HttpStatus.UNAUTHORIZED;
+                case "INVALID_DECISION" -> HttpStatus.BAD_REQUEST;
+                case "APPLICATION_NOT_FOUND" -> HttpStatus.NOT_FOUND;
                 default -> HttpStatus.BAD_REQUEST;
             };
             return ServerResponse.status(status)
