@@ -1,0 +1,11 @@
+dependencies {
+    implementation project(':model')
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    implementation 'org.apache.logging.log4j:log4j-api'
+    implementation 'software.amazon.awssdk:sqs'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
+    implementation platform("software.amazon.awssdk:bom:2.25.54")
+    implementation "software.amazon.awssdk:sts"
+    implementation "software.amazon.awssdk:netty-nio-client"
+
+}
