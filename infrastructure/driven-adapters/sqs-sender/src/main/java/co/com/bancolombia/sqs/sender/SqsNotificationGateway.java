@@ -18,26 +18,23 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 public class SqsNotificationGateway implements NotificationGateway {
 
     private final SqsAsyncClient sqs;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper om;
 
-    @Value("${app.sqs.queue-url}")
+    @Value("${aws.app.sqs.status-queue-url}")
     private String queueUrl;
 
     @Override
-    public Mono<Void> publishStatusChange(StatusChangedEvent e) {
-        try {
+    public Mono<Void> publishStatusChange(StatusChangedEvent evt) {
 
-            String body = mapper.writeValueAsString(e);
-            var req = SendMessageRequest.builder()
-                    .queueUrl(queueUrl)
-                    .messageBody(body)
-                    .build();
-
-            return Mono.fromFuture(sqs.sendMessage(req))
-                    .doOnSuccess(r -> log.info("SQS sent: messageId={}", r.messageId()))
-                    .then();
-        } catch (Exception ex) {
-            return Mono.error(ex);
-        }
+        return Mono.fromCallable(() -> om.writeValueAsString(evt))
+                .flatMap(body -> {
+                    var req = SendMessageRequest.builder()
+                            .queueUrl(queueUrl)
+                            .messageBody(body)
+                            .build();
+                    return Mono.fromFuture(sqs.sendMessage(req));
+                })
+                .doOnSuccess(r -> log.info("SQS sent: messageId={}", r.messageId()))
+                .then();
     }
 }

@@ -9,4 +9,5 @@ public record RegisterLoanApplicationResult(
         Integer statusId,
         String statusName
 ) {
+
 }

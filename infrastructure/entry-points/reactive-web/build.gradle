@@ -7,6 +7,10 @@ dependencies {
     implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.6.0'
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    implementation platform("software.amazon.awssdk:bom:2.25.40")
+    implementation "software.amazon.awssdk:sqs"
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.17.1"
+    implementation "org.slf4j:slf4j-api:2.0.13"
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

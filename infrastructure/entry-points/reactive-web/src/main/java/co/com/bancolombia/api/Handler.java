@@ -1,10 +1,7 @@
 package co.com.bancolombia.api;
 
 import co.com.bancolombia.api.Errors.ErrorMapper;
-import co.com.bancolombia.api.dto.DecisionResponse;
-import co.com.bancolombia.api.dto.DecisionRequest;
-import co.com.bancolombia.api.dto.RegisterLoanApplicationRequest;
-import co.com.bancolombia.api.dto.RegisterLoanApplicationResponse;
+import co.com.bancolombia.api.dto.*;
 import co.com.bancolombia.api.segurity.JwtUtils;
 import co.com.bancolombia.model.auth.Actor;
 import co.com.bancolombia.model.auth.Role;
@@ -13,6 +10,7 @@ import co.com.bancolombia.usecase.decideloan.DecideLoanApplicationUseCase;
 import co.com.bancolombia.usecase.exception.DomainException;
 import co.com.bancolombia.usecase.listmanualreview.ListManualReviewUseCase;
 import co.com.bancolombia.usecase.registerloanapplication.RegisterLoanApplicationUseCase;
+import co.com.bancolombia.usecase.requestcapacity.RequestCapacityCalculationUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +21,7 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.util.Map;
 
 
 @Component
@@ -33,6 +32,7 @@ public class Handler {
     private final RegisterLoanApplicationUseCase registerLoanApplicationUseCase;
     private final ListManualReviewUseCase listManualReviewUseCase;
     private final DecideLoanApplicationUseCase decideLoanApplicationUseCase;
+    private final RequestCapacityCalculationUseCase requestCapacityCalculationUseCase;
 
     public Mono<ServerResponse> register(ServerRequest request) {
         String auth = request.headers().firstHeader(HttpHeaders.AUTHORIZATION);
@@ -105,6 +105,25 @@ public class Handler {
                     log.error("changeStatus() failed", ex);
                     return ErrorMapper.map(ex);
                 })
+                .contextWrite(ctx -> auth != null ? ctx.put("AUTH_TOKEN", auth) : ctx);
+    }
+
+    public Mono<ServerResponse> requestCapacity(ServerRequest request) {
+        String auth = request.headers().firstHeader(HttpHeaders.AUTHORIZATION);
+        Actor actor = actorFromAuth(auth);
+
+        return request.bodyToMono(CapacityRequestDto.class)
+                .flatMap(b -> requestCapacityCalculationUseCase.execute(
+                        new RequestCapacityCalculationUseCase.Cmd(
+                                b.applicationId(), b.identificationNumber(), b.email(),
+                                b.amount(), b.termMonths(), b.annualInterestRate(),
+                                b.monthlyIncome(), b.currentMonthlyDebt()
+                        ), actor
+                ))
+                .then(ServerResponse.accepted()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(Map.of("status","PROCESSING")))
+                .onErrorResume(ex -> ErrorMapper.map(ex))
                 .contextWrite(ctx -> auth != null ? ctx.put("AUTH_TOKEN", auth) : ctx);
     }
 }

@@ -115,7 +115,38 @@ public class RouterRest {
                                             content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class)))
                             }
                     )
+            ),
+            @RouterOperation(
+                    path = "/api/v1/calcular-capacidad",
+                    produces = MediaType.APPLICATION_JSON_VALUE,
+                    method = RequestMethod.POST,
+                    beanClass = Handler.class,
+                    beanMethod = "requestCapacity",
+                    operation = @Operation(
+                            operationId = "requestDebtCapacityCalculation",
+                            summary = "Solicitar cálculo de capacidad de endeudamiento",
+                            description = "Publica en la cola la solicitud de cálculo de capacidad (no calcula sincrónicamente).",
+                            security = { @SecurityRequirement(name = "bearerAuth") },
+                            requestBody = @RequestBody(required = true,
+                                    content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.CapacityRequestDto.class))
+                            ),
+                            responses = {
+                                    @ApiResponse(responseCode = "202", description = "Accepted",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.DecisionResponse.class))),
+                                    @ApiResponse(responseCode = "400", description = "Bad Request",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "401", description = "Unauthorized",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "403", description = "Forbidden",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "422", description = "Unprocessable Entity",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class))),
+                                    @ApiResponse(responseCode = "500", description = "Internal Server Error",
+                                            content = @Content(schema = @Schema(implementation = co.com.bancolombia.api.dto.docs.ErrorResponse.class)))
+                            }
+                    )
             )
+
 
     })
     public RouterFunction<ServerResponse> routes(Handler handler) {
@@ -123,6 +154,7 @@ public class RouterRest {
                 .POST("/api/v1/solicitud", handler::register)
                 .GET("/api/v1/solicitud", handler::list)
                 .PUT("/api/v1/solicitud", handler::changeStatus)
+                .POST("/api/v1/calcular-capacidad", handler::requestCapacity)
                 .build();
     }
 }

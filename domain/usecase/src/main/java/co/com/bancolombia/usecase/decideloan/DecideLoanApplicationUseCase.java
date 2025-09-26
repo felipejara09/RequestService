@@ -7,7 +7,7 @@ import co.com.bancolombia.model.loanapplication.gateways.StateRepository;
 import co.com.bancolombia.model.notification.gateways.NotificationGateway;
 import co.com.bancolombia.usecase.RegisterLoanApplicationResult;
 import co.com.bancolombia.usecase.exception.DomainException;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
 import reactor.core.publisher.Mono;
 
@@ -20,6 +20,8 @@ public class DecideLoanApplicationUseCase {
     private final LoanApplicationRepository repository;
     private final StateRepository stateRepository;
     private final NotificationGateway notifier;
+
+
 
     public Mono<RegisterLoanApplicationResult> execute(UUID applicationId, Decision decision, Actor actor) {
         if (actor == null || actor.getRole() == null) return Mono.error(new DomainException("UNAUTHORIZED"));
@@ -36,9 +38,8 @@ public class DecideLoanApplicationUseCase {
                                         notifier.publishStatusChange(
                                                 new NotificationGateway.StatusChangedEvent(
                                                         updated.getApplicationId(),
-                                                        updated.getEmail(),
                                                         updated.getStatusId(),
-                                                        statusName
+                                                        updated.getAmount()
                                                 )
                                         ).thenReturn(new RegisterLoanApplicationResult(
                                                 updated.getApplicationId(),
